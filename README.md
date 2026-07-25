@@ -61,5 +61,5 @@ Pour éviter que deux notes consécutives de même hauteur sur un même canal ne
 
 1.  Ouvrez votre application dans **Zyllio Studio**.
 2.  Accédez au panneau **Concepteur / Plugins**.
-3.  Ajoutez le fichier JavaScript du plugin : `src/clean-midi.js`.
+3.  Ajoutez le fichier JavaScript du plugin : `src/plugin.js`.
 4.  L'action **Nettoyer fichier MIDI** apparaîtra dans votre catalogue d'actions sous la catégorie **Documents**.
