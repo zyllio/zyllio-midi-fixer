@@ -1,0 +1,7 @@
+{
+  "name": "Nettoyeur MIDI",
+  "description": "Fournit une Action qui normalise et nettoie les fichiers MIDI pour les synthétiseurs matériels.",
+  "company": "Zyllio team",
+  "icon": "https://studio.zyllio.com/assets/icon.png",
+  "version": "2.0.0"
+}
