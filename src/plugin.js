@@ -28,7 +28,6 @@
       // Exécution de la logique métier pure (Section 2)
       const options = {
         keepCc: this.keepCc === true || this.keepCc === 'true',
-        keepPb: this.keepPb === true || this.keepPb === 'true',
         dedupeNotes: this.dedupeNotes !== false && this.dedupeNotes !== 'false',
         fixOverlaps: this.fixOverlaps !== false && this.fixOverlaps !== 'false'
       };
@@ -82,11 +81,6 @@
       type: 'boolean',
       default: false
     }, {
-      id: 'keep-pb',
-      name: 'Conserver le Pitch Bend',
-      type: 'boolean',
-      default: false
-    }, {
       id: 'dedupe-notes',
       name: 'Supprimer les doublons de notes',
       type: 'boolean',
@@ -105,7 +99,6 @@
         { id: 'value', name: 'Cleaned MIDI URL' },
         { id: 'file-url', name: 'Original MIDI URL' },
         { id: 'keep-cc', name: 'Keep Control Changes' },
-        { id: 'keep-pb', name: 'Keep Pitch Bend' },
         { id: 'dedupe-notes', name: 'Remove Duplicate Notes' },
         { id: 'fix-overlaps', name: 'Resolve Overlaps' }
       ]
@@ -144,6 +137,7 @@
   const isNoteEnd = (event) => event.type === "noteOff" || (event.type === "noteOn" && event.velocity === 0);
   const isNoteEvent = (event) => isPlayableNoteOn(event) || isNoteEnd(event);
   const isTimingEvent = (event) => event.type === "setTempo" || event.type === "timeSignature";
+  const getPitchBendValue = (event) => event.value === undefined ? 0 : event.value;
 
   const getTimingEventKey = (event) => JSON.stringify({
     type: event.type,
@@ -188,7 +182,6 @@
     const sourceTicksPerBeat = inputMidi.header.ticksPerBeat;
     
     const keepCc = !!options.keepCc;
-    const keepPb = !!options.keepPb;
     const dedupeNotes = options.dedupeNotes !== false;
     const fixOverlaps = options.fixOverlaps !== false;
 
@@ -334,6 +327,7 @@
 
       // Métadonnées additionnelles
       const optional = [];
+      const pitchBendByChannel = new Map();
       t.events.forEach((event) => {
         if (keepCc && event.type === "controller") {
           optional.push({
@@ -342,7 +336,12 @@
             sourceOrder: event.sourceOrder,
             channel: t.destinationChannel
           });
-        } else if (keepPb && event.type === "pitchBend") {
+        } else if (event.type === "pitchBend") {
+          const value = getPitchBendValue(event);
+          const previousValue = pitchBendByChannel.has(t.destinationChannel) ? pitchBendByChannel.get(t.destinationChannel) : 0;
+          if (value === previousValue) return;
+
+          pitchBendByChannel.set(t.destinationChannel, value);
           optional.push({
             ...withoutRuntimeFields(event),
             absoluteTime: scaleTick(event.absoluteTime, sourceTicksPerBeat, TARGET_TICKS_PER_BEAT),

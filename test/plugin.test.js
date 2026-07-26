@@ -30,6 +30,14 @@ describe("plugin cleanMidi", () => {
     expect(targetTicksPerBeat).toBeUndefined();
   });
 
+  test("does not expose a pitch bend option", () => {
+    const { registered } = loadPlugin();
+
+    const keepPitchBend = registered[0].metadata.properties.find((property) => property.id === "keep-pb");
+
+    expect(keepPitchBend).toBeUndefined();
+  });
+
   test("always keeps track names", () => {
     const { cleanMidi } = loadPlugin();
     const output = cleanMidi({
@@ -51,5 +59,28 @@ describe("plugin cleanMidi", () => {
     });
 
     expect(eventsOfType(output.tracks[0], "noteOn")[0].channel).toBe(9);
+  });
+
+  test("keeps only useful pitch bend changes", () => {
+    const { cleanMidi } = loadPlugin();
+    const output = cleanMidi({
+      header: { format: 1, ticksPerBeat: 480, numTracks: 1 },
+      tracks: [[
+        { deltaTime: 0, type: "trackName", text: "Lead" },
+        { deltaTime: 0, type: "pitchBend", channel: 4, value: 0 },
+        { deltaTime: 10, type: "pitchBend", channel: 4, value: 1200 },
+        { deltaTime: 5, type: "pitchBend", channel: 4, value: 1200 },
+        { deltaTime: 5, type: "pitchBend", channel: 4, value: 0 },
+        { deltaTime: 5, type: "pitchBend", channel: 4, value: 0 },
+        { deltaTime: 0, type: "noteOn", channel: 4, noteNumber: 60, velocity: 80 },
+        { deltaTime: 480, type: "noteOff", channel: 4, noteNumber: 60, velocity: 0 },
+        { deltaTime: 0, meta: true, type: "endOfTrack" }
+      ]]
+    });
+
+    const pitchBends = eventsOfType(output.tracks[0], "pitchBend");
+
+    expect(pitchBends.map((event) => event.value)).toEqual([1200, 0]);
+    expect(pitchBends.map((event) => event.channel)).toEqual([0, 0]);
   });
 });
