@@ -14,10 +14,8 @@ L'action est déclarée sous la version **Action V2** (`metadataVersion: 2`) ave
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **`file-url`** | URL MIDI D'origine | `text` | `""` | URL du fichier MIDI brut à nettoyer. | Non |
 | **`value`** | URL MIDI Nettoyé | `text` | `""` | URL publique du fichier MIDI final traité. | **Oui** (Résultat) |
-| **`target-ticks-per-beat`** | PPQN Cible | `number` | `960` | Résolution temporelle du fichier de sortie (ticks par beat). | Non |
 | **`keep-cc`** | Conserver les CC | `boolean` | `false` | Conserve les événements de type Control Change (modulation, volume, expression). | Non |
 | **`keep-pb`** | Conserver le Pitch Bend | `boolean` | `false` | Conserve les événements de Pitch Bend (glissement de note). | Non |
-| **`keep-names`** | Conserver les noms de pistes | `boolean` | `false` | Conserve les métadonnées textuelles des noms de pistes. | Non |
 | **`dedupe-notes`** | Supprimer les doublons de notes | `boolean` | `true` | Supprime les notes identiques superposées. | Non |
 | **`fix-overlaps`** | Résoudre les chevauchements | `boolean` | `true` | Corrige les notes consécutives d'une même hauteur qui se touchent. | Non |
 

@@ -1,0 +1,12 @@
+{
+  "name": "zyllio-midi-fixer",
+  "version": "1.0.0",
+  "description": "Tests and fixtures for the Zyllio Clean MIDI plugin.",
+  "private": true,
+  "scripts": {
+    "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js"
+  },
+  "devDependencies": {
+    "jest": "^30.0.0"
+  }
+}

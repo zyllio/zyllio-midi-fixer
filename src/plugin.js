@@ -27,10 +27,8 @@
 
       // Exécution de la logique métier pure (Section 2)
       const options = {
-        targetTicksPerBeat: parseInt(this.targetTicksPerBeat, 10) || 960,
         keepCc: this.keepCc === true || this.keepCc === 'true',
         keepPb: this.keepPb === true || this.keepPb === 'true',
-        keepNames: this.keepNames === true || this.keepNames === 'true',
         dedupeNotes: this.dedupeNotes !== false && this.dedupeNotes !== 'false',
         fixOverlaps: this.fixOverlaps !== false && this.fixOverlaps !== 'false'
       };
@@ -79,11 +77,6 @@
       type: 'text',
       default: '',
     }, {
-      id: 'target-ticks-per-beat',
-      name: 'PPQN Cible',
-      type: 'number',
-      default: 960
-    }, {
       id: 'keep-cc',
       name: 'Conserver les CC',
       type: 'boolean',
@@ -91,11 +84,6 @@
     }, {
       id: 'keep-pb',
       name: 'Conserver le Pitch Bend',
-      type: 'boolean',
-      default: false
-    }, {
-      id: 'keep-names',
-      name: 'Conserver les noms de pistes',
       type: 'boolean',
       default: false
     }, {
@@ -116,10 +104,8 @@
       properties: [
         { id: 'value', name: 'Cleaned MIDI URL' },
         { id: 'file-url', name: 'Original MIDI URL' },
-        { id: 'target-ticks-per-beat', name: 'Target PPQN' },
         { id: 'keep-cc', name: 'Keep Control Changes' },
         { id: 'keep-pb', name: 'Keep Pitch Bend' },
-        { id: 'keep-names', name: 'Keep Track Names' },
         { id: 'dedupe-notes', name: 'Remove Duplicate Notes' },
         { id: 'fix-overlaps', name: 'Resolve Overlaps' }
       ]
@@ -134,6 +120,7 @@
 // SECTION 2 : LOGIQUE MÉTIER PURE (IIFE - EXPOSÉE SUR WINDOW)
 // ============================================================================
 (function (global) {
+  const TARGET_TICKS_PER_BEAT = 960;
   const MELODIC_CHANNELS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15];
 
   // Helpers de manipulation d'événements
@@ -199,11 +186,9 @@
    */
   function cleanMidi(inputMidi, options = {}) {
     const sourceTicksPerBeat = inputMidi.header.ticksPerBeat;
-    const targetTicksPerBeat = options.targetTicksPerBeat || 960;
     
     const keepCc = !!options.keepCc;
     const keepPb = !!options.keepPb;
-    const keepNames = !!options.keepNames;
     const dedupeNotes = options.dedupeNotes !== false;
     const fixOverlaps = options.fixOverlaps !== false;
 
@@ -238,7 +223,7 @@
         seenTimings.add(key);
         timingEvents.push({
           ...withoutRuntimeFields(event),
-          absoluteTime: scaleTick(event.absoluteTime, sourceTicksPerBeat, targetTicksPerBeat),
+          absoluteTime: scaleTick(event.absoluteTime, sourceTicksPerBeat, TARGET_TICKS_PER_BEAT),
           sourceOrder: event.sourceOrder
         });
       });
@@ -263,8 +248,8 @@
 
         if (stack.length === 0) return;
         const startEvent = stack.shift();
-        const startTime = scaleTick(startEvent.absoluteTime, sourceTicksPerBeat, targetTicksPerBeat);
-        const endTime = Math.max(scaleTick(event.absoluteTime, sourceTicksPerBeat, targetTicksPerBeat), startTime + 1);
+        const startTime = scaleTick(startEvent.absoluteTime, sourceTicksPerBeat, TARGET_TICKS_PER_BEAT);
+        const endTime = Math.max(scaleTick(event.absoluteTime, sourceTicksPerBeat, TARGET_TICKS_PER_BEAT), startTime + 1);
 
         notes.push({
           start: startTime,
@@ -280,10 +265,10 @@
       // Gestion des notes suspendues
       activeNotes.forEach((stack) => {
         stack.forEach((startEvent) => {
-          const startTime = scaleTick(startEvent.absoluteTime, sourceTicksPerBeat, targetTicksPerBeat);
+          const startTime = scaleTick(startEvent.absoluteTime, sourceTicksPerBeat, TARGET_TICKS_PER_BEAT);
           notes.push({
             start: startTime,
-            end: Math.max(scaleTick(t.endTime, sourceTicksPerBeat, targetTicksPerBeat), startTime + 1),
+            end: Math.max(scaleTick(t.endTime, sourceTicksPerBeat, TARGET_TICKS_PER_BEAT), startTime + 1),
             channel: t.destinationChannel,
             noteNumber: startEvent.noteNumber,
             velocity: startEvent.velocity,
@@ -353,21 +338,21 @@
         if (keepCc && event.type === "controller") {
           optional.push({
             ...withoutRuntimeFields(event),
-            absoluteTime: scaleTick(event.absoluteTime, sourceTicksPerBeat, targetTicksPerBeat),
+            absoluteTime: scaleTick(event.absoluteTime, sourceTicksPerBeat, TARGET_TICKS_PER_BEAT),
             sourceOrder: event.sourceOrder,
             channel: t.destinationChannel
           });
         } else if (keepPb && event.type === "pitchBend") {
           optional.push({
             ...withoutRuntimeFields(event),
-            absoluteTime: scaleTick(event.absoluteTime, sourceTicksPerBeat, targetTicksPerBeat),
+            absoluteTime: scaleTick(event.absoluteTime, sourceTicksPerBeat, TARGET_TICKS_PER_BEAT),
             sourceOrder: event.sourceOrder,
             channel: t.destinationChannel
           });
-        } else if (keepNames && (event.type === "trackName" || event.type === "instrumentName" || event.type === "text")) {
+        } else if (event.type === "trackName" || event.type === "instrumentName" || event.type === "text") {
           optional.push({
             ...withoutRuntimeFields(event),
-            absoluteTime: scaleTick(event.absoluteTime, sourceTicksPerBeat, targetTicksPerBeat),
+            absoluteTime: scaleTick(event.absoluteTime, sourceTicksPerBeat, TARGET_TICKS_PER_BEAT),
             sourceOrder: event.sourceOrder
           });
         }
@@ -393,7 +378,7 @@
     const outputTracks = outputEventsByTrack.map((events, idx) => {
       const sorted = [...events].sort(compareEvents);
       const lastTime = sorted.length > 0 ? sorted[sorted.length - 1].absoluteTime : 0;
-      const endTime = Math.max(scaleTick(trackInfos[idx].endTime, sourceTicksPerBeat, targetTicksPerBeat), lastTime);
+      const endTime = Math.max(scaleTick(trackInfos[idx].endTime, sourceTicksPerBeat, TARGET_TICKS_PER_BEAT), lastTime);
       let previousTime = 0;
 
       const deltaEvents = sorted.map((event) => {
@@ -410,7 +395,7 @@
       header: {
         ...inputMidi.header,
         format: 1,
-        ticksPerBeat: targetTicksPerBeat,
+        ticksPerBeat: TARGET_TICKS_PER_BEAT,
         numTracks: outputTracks.length
       },
       tracks: outputTracks
