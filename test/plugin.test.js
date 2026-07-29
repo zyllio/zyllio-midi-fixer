@@ -38,6 +38,14 @@ describe("plugin cleanMidi", () => {
     expect(keepPitchBend).toBeUndefined();
   });
 
+  test("does not expose a dedupe notes option", () => {
+    const { registered } = loadPlugin();
+
+    const dedupeNotes = registered[0].metadata.properties.find((property) => property.id === "dedupe-notes");
+
+    expect(dedupeNotes).toBeUndefined();
+  });
+
   test("always keeps track names", () => {
     const { cleanMidi } = loadPlugin();
     const output = cleanMidi({

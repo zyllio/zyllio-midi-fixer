@@ -28,7 +28,6 @@
       // Exécution de la logique métier pure (Section 2)
       const options = {
         keepCc: this.keepCc === true || this.keepCc === 'true',
-        dedupeNotes: this.dedupeNotes !== false && this.dedupeNotes !== 'false',
         fixOverlaps: this.fixOverlaps !== false && this.fixOverlaps !== 'false'
       };
 
@@ -81,11 +80,6 @@
       type: 'boolean',
       default: false
     }, {
-      id: 'dedupe-notes',
-      name: 'Supprimer les doublons de notes',
-      type: 'boolean',
-      default: true
-    }, {
       id: 'fix-overlaps',
       name: 'Résoudre les chevauchements',
       type: 'boolean',
@@ -99,7 +93,6 @@
         { id: 'value', name: 'Cleaned MIDI URL' },
         { id: 'file-url', name: 'Original MIDI URL' },
         { id: 'keep-cc', name: 'Keep Control Changes' },
-        { id: 'dedupe-notes', name: 'Remove Duplicate Notes' },
         { id: 'fix-overlaps', name: 'Resolve Overlaps' }
       ]
     }]
@@ -182,7 +175,6 @@
     const sourceTicksPerBeat = inputMidi.header.ticksPerBeat;
     
     const keepCc = !!options.keepCc;
-    const dedupeNotes = options.dedupeNotes !== false;
     const fixOverlaps = options.fixOverlaps !== false;
 
     // 1. Classification & allocation des canaux
@@ -272,26 +264,6 @@
       });
 
       let finalNotes = notes;
-
-      // Dédoublonnage
-      if (dedupeNotes) {
-        const notesByKey = new Map();
-        finalNotes.forEach((n) => {
-          const key = `${n.start}:${n.end}:${n.channel}:${n.noteNumber}`;
-          const existing = notesByKey.get(key);
-          if (!existing || n.velocity > existing.velocity) notesByKey.set(key, n);
-        });
-
-        const dedupedByStart = new Map();
-        notesByKey.forEach((n) => {
-          const key = `${n.start}:${n.channel}:${n.noteNumber}`;
-          const existing = dedupedByStart.get(key);
-          if (!existing || n.velocity > existing.velocity || (n.velocity === existing.velocity && n.end > existing.end)) {
-            dedupedByStart.set(key, n);
-          }
-        });
-        finalNotes = [...dedupedByStart.values()];
-      }
 
       // Résolution des chevauchements
       if (fixOverlaps) {

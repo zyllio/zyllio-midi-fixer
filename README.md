@@ -15,7 +15,6 @@ L'action est déclarée sous la version **Action V2** (`metadataVersion: 2`) ave
 | **`file-url`** | URL MIDI D'origine | `text` | `""` | URL du fichier MIDI brut à nettoyer. | Non |
 | **`value`** | URL MIDI Nettoyé | `text` | `""` | URL publique du fichier MIDI final traité. | **Oui** (Résultat) |
 | **`keep-cc`** | Conserver les CC | `boolean` | `false` | Conserve les événements de type Control Change (modulation, volume, expression). | Non |
-| **`dedupe-notes`** | Supprimer les doublons de notes | `boolean` | `true` | Supprime les notes identiques superposées. | Non |
 | **`fix-overlaps`** | Résoudre les chevauchements | `boolean` | `true` | Corrige les notes consécutives d'une même hauteur qui se touchent. | Non |
 
 ### Transitions
@@ -44,10 +43,7 @@ Les événements globaux de tempo (`setTempo`) et de signature rythmique (`timeS
 Pour chaque piste instrumentale, le script apparie chaque événement d'allumage de note (`noteOn` avec vélocité > 0) avec son événement d'extinction (`noteOff` ou `noteOn` avec vélocité = 0) correspondant pour la même note :
 *   Si une note est "suspendue" (aucun message d'extinction trouvé avant la fin de la piste), le script force sa fin au tick de fin de la piste (`endTime`).
 
-### E. Dédoublonnage des Notes
-Si deux notes identiques (même canal, même note, même début, même fin) sont présentes, le script ne conserve que celle ayant la vélocité la plus élevée. Si deux notes démarrent en même temps, celle ayant la vélocité maximale (ou la durée maximale en cas d'égalité) est conservée.
-
-### F. Résolution des Chevauchements
+### E. Résolution des Chevauchements
 Pour éviter que deux notes consécutives de même hauteur sur un même canal ne se chevauchent ou ne s'éteignent/s'allument au même tick (ce qui peut empêcher certains synthétiseurs physiques de re-déclencher la note), le script raccourcit la première note :
 *   Sa fin est ajustée à : `fin_note_1 = debut_note_2 - 1`.
 *   Si cet ajustement réduit la durée de la note à 0 ou moins, la note 1 est tout simplement supprimée.
