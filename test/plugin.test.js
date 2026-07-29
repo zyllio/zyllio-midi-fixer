@@ -13,6 +13,34 @@ function eventsOfType(track, type) {
   return track.filter((event) => event.type === type);
 }
 
+function absoluteEvents(track) {
+  let absoluteTime = 0;
+  return track.map((event) => {
+    absoluteTime += event.deltaTime || 0;
+    return { ...event, absoluteTime };
+  });
+}
+
+function labelColumnSignature(track) {
+  const columns = new Map();
+  absoluteEvents(track)
+    .filter((event) =>
+      event.type === "noteOn" &&
+      event.velocity === 1 &&
+      event.noteNumber >= 123
+    )
+    .forEach((event) => {
+      const notes = columns.get(event.absoluteTime) || [];
+      notes.push(event.noteNumber);
+      columns.set(event.absoluteTime, notes);
+    });
+
+  return [...columns.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([, notes]) => notes.sort((a, b) => b - a).join(","))
+    .join("|");
+}
+
 describe("plugin cleanMidi", () => {
   test("does not expose a keep-names option", () => {
     const { registered } = loadPlugin();
@@ -97,6 +125,62 @@ describe("plugin cleanMidi", () => {
 
     expect(eventsOfType(output.tracks[0], "noteOn")).toEqual([]);
     expect(eventsOfType(output.tracks[1], "noteOn")).toHaveLength(1);
+  });
+
+  test("does not draw track labels by default", () => {
+    const { cleanMidi } = loadPlugin();
+    const output = cleanMidi({
+      header: { format: 1, ticksPerBeat: 480, numTracks: 1 },
+      tracks: [noteTrack("Lead Vocals")]
+    });
+
+    const labelNotes = absoluteEvents(output.tracks[0]).filter((event) =>
+      event.type === "noteOn" &&
+      event.velocity === 1 &&
+      event.noteNumber >= 123
+    );
+
+    expect(labelNotes).toEqual([]);
+  });
+
+  test("can draw a visible piano roll label at the start of a track", () => {
+    const { cleanMidi } = loadPlugin();
+    const output = cleanMidi({
+      header: { format: 1, ticksPerBeat: 480, numTracks: 1 },
+      tracks: [noteTrack("Lead Vocals")]
+    }, { drawTrackLabels: true });
+
+    const labelNotes = absoluteEvents(output.tracks[0]).filter((event) =>
+      event.type === "noteOn" &&
+      event.velocity === 1 &&
+      event.noteNumber >= 123
+    );
+
+    expect(labelNotes.length).toBeGreaterThan(0);
+    expect(labelNotes[0]).toMatchObject({
+      absoluteTime: 0,
+      channel: 0,
+      noteNumber: 127,
+      velocity: 1
+    });
+    expect(Math.max(...labelNotes.map((event) => event.absoluteTime))).toBeGreaterThanOrEqual(2400);
+  });
+
+  test("uses detailed label mappings instead of broad string labels", () => {
+    const { cleanMidi } = loadPlugin();
+    const output = cleanMidi({
+      header: { format: 1, ticksPerBeat: 480, numTracks: 4 },
+      tracks: [
+        noteTrack("Orchestra | violin sect. 1"),
+        noteTrack("Orchestra | viola sect 1"),
+        noteTrack("Orchestra | Cello"),
+        noteTrack("Orchestra | Pizzicato Strings")
+      ]
+    }, { drawTrackLabels: true });
+
+    const signatures = output.tracks.map(labelColumnSignature);
+
+    expect(new Set(signatures).size).toBe(4);
   });
 
   test("keeps only useful pitch bend changes", () => {

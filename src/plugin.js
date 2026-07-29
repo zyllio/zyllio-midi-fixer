@@ -29,6 +29,7 @@
       const options = {
         keepCc: this.keepCc === true || this.keepCc === 'true',
         removeLeadVocals: this.removeLeadVocals === true || this.removeLeadVocals === 'true',
+        drawTrackLabels: this.drawTrackLabels === true || this.drawTrackLabels === 'true',
         fixOverlaps: this.fixOverlaps !== false && this.fixOverlaps !== 'false'
       };
 
@@ -86,6 +87,11 @@
       type: 'boolean',
       default: false
     }, {
+      id: 'draw-track-labels',
+      name: 'Dessiner les noms de pistes',
+      type: 'boolean',
+      default: false
+    }, {
       id: 'fix-overlaps',
       name: 'Résoudre les chevauchements',
       type: 'boolean',
@@ -100,6 +106,7 @@
         { id: 'file-url', name: 'Original MIDI URL' },
         { id: 'keep-cc', name: 'Keep Control Changes' },
         { id: 'remove-lead-vocals', name: 'Remove Lead Vocals' },
+        { id: 'draw-track-labels', name: 'Draw Track Labels' },
         { id: 'fix-overlaps', name: 'Resolve Overlaps' }
       ]
     }]
@@ -115,6 +122,68 @@
 (function (global) {
   const TARGET_TICKS_PER_BEAT = 960;
   const MELODIC_CHANNELS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15];
+  const LABEL_TOP_NOTE = 127;
+  const LABEL_PIXEL_TICKS = 180;
+  const LABEL_STEP_TICKS = 240;
+  const LABEL_VELOCITY = 1;
+  const LABEL_MAX_LENGTH = 5;
+  const TRACK_LABEL_RULES = [
+    { label: "DRM", match: /\b(drums?|drumkit|percussion|perc|batterie|bateria|kick|snare|tom|cymbal|charley|hi[- ]?hat|hihat)\b/i },
+    { label: "VOX", match: /\b(lead vocals?|chant|voix|vocal lead)\b/i, exclude: /\b(backing vocals?|choirs?|choeur|choeurs|chorus|aahs?|oohs?)\b/i },
+    { label: "BKVOX", match: /\b(backing vocals?)\b/i },
+    { label: "CHOIR", match: /\b(choirs?|choeur|choeurs|chorus|aahs?|oohs?)\b/i },
+    { label: "BASS", match: /\b(bass|basse)\b/i },
+    { label: "CBASS", match: /\b(contrabass|contrebase)\b/i },
+    { label: "GTR", match: /\b(guitar|guitare|les paul)\b/i },
+    { label: "PNO", match: /\b(piano)\b/i },
+    { label: "VIOL", match: /\b(violin)\b/i },
+    { label: "VLA", match: /\b(viola)\b/i },
+    { label: "CELLO", match: /\b(cello)\b/i },
+    { label: "PIZZ", match: /\b(pizzicato)\b/i },
+    { label: "STR", match: /\b(strings?|string ensemble)\b/i },
+    { label: "ORCH", match: /\b(orchestra|orchestre)\b/i },
+    { label: "BRASS", match: /\b(brass)\b/i },
+    { label: "SYN", match: /\b(synth)\b/i },
+    { label: "PAD", match: /\b(pad)\b/i }
+  ];
+  const LABEL_FONT = {
+    "A": ["111", "101", "111", "101", "101"],
+    "B": ["110", "101", "110", "101", "110"],
+    "C": ["111", "100", "100", "100", "111"],
+    "D": ["110", "101", "101", "101", "110"],
+    "E": ["111", "100", "110", "100", "111"],
+    "F": ["111", "100", "110", "100", "100"],
+    "G": ["111", "100", "101", "101", "111"],
+    "H": ["101", "101", "111", "101", "101"],
+    "I": ["111", "010", "010", "010", "111"],
+    "J": ["001", "001", "001", "101", "111"],
+    "K": ["101", "101", "110", "101", "101"],
+    "L": ["100", "100", "100", "100", "111"],
+    "M": ["101", "111", "111", "101", "101"],
+    "N": ["101", "111", "111", "111", "101"],
+    "O": ["111", "101", "101", "101", "111"],
+    "P": ["111", "101", "111", "100", "100"],
+    "Q": ["111", "101", "101", "111", "001"],
+    "R": ["110", "101", "110", "101", "101"],
+    "S": ["111", "100", "111", "001", "111"],
+    "T": ["111", "010", "010", "010", "010"],
+    "U": ["101", "101", "101", "101", "111"],
+    "V": ["101", "101", "101", "101", "010"],
+    "W": ["101", "101", "111", "111", "101"],
+    "X": ["101", "101", "010", "101", "101"],
+    "Y": ["101", "101", "010", "010", "010"],
+    "Z": ["111", "001", "010", "100", "111"],
+    "0": ["111", "101", "101", "101", "111"],
+    "1": ["010", "110", "010", "010", "111"],
+    "2": ["111", "001", "111", "100", "111"],
+    "3": ["111", "001", "111", "001", "111"],
+    "4": ["101", "101", "111", "001", "001"],
+    "5": ["111", "100", "111", "001", "111"],
+    "6": ["111", "100", "111", "101", "111"],
+    "7": ["111", "001", "010", "010", "010"],
+    "8": ["111", "101", "111", "101", "111"],
+    "9": ["111", "101", "111", "001", "111"]
+  };
 
   // Helpers de manipulation d'événements
   const toAbsoluteEvents = (track) => {
@@ -184,6 +253,46 @@
     return isLeadVocalName && !isChoirTrackText(text);
   };
 
+  const getTrackLabel = (track, isPercussion) => {
+    const text = getTrackText(track);
+    if (isPercussion) return "DRM";
+
+    const rule = TRACK_LABEL_RULES.find((candidate) =>
+      candidate.match.test(text) &&
+      (!candidate.exclude || !candidate.exclude.test(text))
+    );
+    if (rule) return rule.label;
+
+    return text.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, LABEL_MAX_LENGTH) || "TRK";
+  };
+
+  const buildLabelEvents = (label, channel) => {
+    const events = [];
+    let columnOffset = 0;
+    label.toUpperCase().slice(0, LABEL_MAX_LENGTH).split("").forEach((char) => {
+      const glyph = LABEL_FONT[char];
+      if (!glyph) {
+        columnOffset += 2;
+        return;
+      }
+
+      glyph.forEach((row, rowIndex) => {
+        row.split("").forEach((pixel, columnIndex) => {
+          if (pixel !== "1") return;
+          const absoluteTime = (columnOffset + columnIndex) * LABEL_STEP_TICKS;
+          const noteNumber = LABEL_TOP_NOTE - rowIndex;
+          events.push(
+            { absoluteTime, sourceOrder: -1000, type: "noteOn", channel, noteNumber, velocity: LABEL_VELOCITY },
+            { absoluteTime: absoluteTime + LABEL_PIXEL_TICKS, sourceOrder: -999, type: "noteOff", channel, noteNumber, velocity: 0 }
+          );
+        });
+      });
+
+      columnOffset += 4;
+    });
+    return events;
+  };
+
   /**
    * Fonction logique pure de nettoyage MIDI. Exclut toute référence spécifique à Zyllio.
    */
@@ -192,6 +301,7 @@
     
     const keepCc = !!options.keepCc;
     const removeLeadVocals = !!options.removeLeadVocals;
+    const drawTrackLabels = !!options.drawTrackLabels;
     const fixOverlaps = options.fixOverlaps !== false;
 
     // 1. Classification & allocation des canaux
@@ -202,6 +312,7 @@
       const isInstrument = notesCount > 0 && !shouldRemoveTrack;
       return {
         index,
+        track,
         events,
         isInstrument,
         shouldRemoveTrack,
@@ -315,6 +426,10 @@
         { absoluteTime: n.start, sourceOrder: n.startOrder, type: "noteOn", channel: n.channel, noteNumber: n.noteNumber, velocity: n.velocity },
         { absoluteTime: n.end, sourceOrder: n.endOrder, type: "noteOff", channel: n.channel, noteNumber: n.noteNumber, velocity: 0 }
       ]);
+
+      if (drawTrackLabels) {
+        trackEvents.push(...buildLabelEvents(getTrackLabel(t.track, t.isPercussion), t.destinationChannel));
+      }
 
       // Métadonnées additionnelles
       const optional = [];

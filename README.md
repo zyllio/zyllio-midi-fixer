@@ -16,6 +16,7 @@ L'action est déclarée sous la version **Action V2** (`metadataVersion: 2`) ave
 | **`value`** | URL MIDI Nettoyé | `text` | `""` | URL publique du fichier MIDI final traité. | **Oui** (Résultat) |
 | **`keep-cc`** | Conserver les CC | `boolean` | `false` | Conserve les événements de type Control Change (modulation, volume, expression). | Non |
 | **`remove-lead-vocals`** | Retirer le chant principal | `boolean` | `false` | Exclut les pistes identifiées comme chant principal, sans retirer les choeurs. | Non |
+| **`draw-track-labels`** | Dessiner les noms de pistes | `boolean` | `false` | Ajoute un label visuel en notes MIDI très aiguës à vélocité 1 au début de chaque piste. | Non |
 | **`fix-overlaps`** | Résoudre les chevauchements | `boolean` | `true` | Corrige les notes consécutives d'une même hauteur qui se touchent. | Non |
 
 ### Transitions
@@ -47,7 +48,32 @@ Pour chaque piste instrumentale, le script apparie chaque événement d'allumage
 ### E. Exclusion optionnelle du chant principal
 Lorsque l'option `remove-lead-vocals` est activée, les pistes dont les métadonnées contiennent des termes comme `lead vocal`, `lead vocals`, `chant`, `voix` ou `vocal lead` sont ignorées. Les pistes de choeurs restent conservées si elles contiennent des termes comme `backing vocals`, `choir`, `choeur`, `chorus`, `aah` ou `ooh`.
 
-### F. Résolution des Chevauchements
+### F. Labels visuels dans le piano roll
+Lorsque l'option `draw-track-labels` est activée, le script ajoute au tick `0` de chaque piste instrumentale un label court dessiné avec des notes MIDI dans l'extrême aigu. Ces notes utilisent une vélocité de `1` et servent de repère visuel dans les synthétiseurs qui affichent seulement le piano roll. Le morceau n'est pas décalé.
+
+Les labels sont abrégés automatiquement selon une table de correspondance ordonnée :
+
+| Label | Pistes ciblées |
+| :--- | :--- |
+| `DRM` | Batterie, drums, percussions, charley, kick, snare, tom, cymbal |
+| `VOX` | Chant principal, lead vocals, voix |
+| `BKVOX` | Backing vocals |
+| `CHOIR` | Choir, choeur, chorus, aahs, oohs |
+| `BASS` | Bass, basse |
+| `CBASS` | Contrabass, contrebasse |
+| `GTR` | Guitar, guitare, Les Paul |
+| `PNO` | Piano |
+| `VIOL` | Violin |
+| `VLA` | Viola |
+| `CELLO` | Cello |
+| `PIZZ` | Pizzicato |
+| `STR` | Strings, string ensemble |
+| `ORCH` | Orchestra, orchestre |
+| `BRASS` | Brass |
+| `SYN` | Synth |
+| `PAD` | Pad |
+
+### G. Résolution des Chevauchements
 Pour éviter que deux notes consécutives de même hauteur sur un même canal ne se chevauchent ou ne s'éteignent/s'allument au même tick (ce qui peut empêcher certains synthétiseurs physiques de re-déclencher la note), le script raccourcit la première note :
 *   Sa fin est ajustée à : `fin_note_1 = debut_note_2 - 1`.
 *   Si cet ajustement réduit la durée de la note à 0 ou moins, la note 1 est tout simplement supprimée.
