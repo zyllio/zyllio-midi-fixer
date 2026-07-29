@@ -28,7 +28,7 @@
       // Exécution de la logique métier pure (Section 2)
       const options = {
         keepCc: this.keepCc === true || this.keepCc === 'true',
-        removeLeadVocals: this.removeLeadVocals === true || this.removeLeadVocals === 'true',
+        removeLeadVocals: this.removeLeadVocals !== false && this.removeLeadVocals !== 'false',
         drawTrackLabels: this.drawTrackLabels === true || this.drawTrackLabels === 'true',
         fixOverlaps: this.fixOverlaps !== false && this.fixOverlaps !== 'false'
       };
@@ -85,7 +85,7 @@
       id: 'remove-lead-vocals',
       name: 'Retirer le chant principal',
       type: 'boolean',
-      default: false
+      default: true
     }, {
       id: 'draw-track-labels',
       name: 'Dessiner les noms de pistes',
@@ -122,7 +122,7 @@
 (function (global) {
   const TARGET_TICKS_PER_BEAT = 960;
   const MELODIC_CHANNELS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15];
-  const LABEL_TOP_NOTE = 127;
+  const LABEL_TOP_NOTE = 120;
   const LABEL_PIXEL_TICKS = 180;
   const LABEL_STEP_TICKS = 240;
   const LABEL_VELOCITY = 1;
@@ -153,11 +153,11 @@
     "D": ["110", "101", "101", "101", "110"],
     "E": ["111", "100", "110", "100", "111"],
     "F": ["111", "100", "110", "100", "100"],
-    "G": ["111", "100", "101", "101", "111"],
+    "G": ["111", "100", "101", "101", "011"],
     "H": ["101", "101", "111", "101", "101"],
     "I": ["111", "010", "010", "010", "111"],
     "J": ["001", "001", "001", "101", "111"],
-    "K": ["101", "101", "110", "101", "101"],
+    "K": ["101", "110", "100", "110", "101"],
     "L": ["100", "100", "100", "100", "111"],
     "M": ["101", "111", "111", "101", "101"],
     "N": ["101", "111", "111", "111", "101"],
@@ -288,7 +288,7 @@
         });
       });
 
-      columnOffset += 4;
+      columnOffset += glyph[0].length + 1;
     });
     return events;
   };
@@ -300,7 +300,7 @@
     const sourceTicksPerBeat = inputMidi.header.ticksPerBeat;
     
     const keepCc = !!options.keepCc;
-    const removeLeadVocals = !!options.removeLeadVocals;
+    const removeLeadVocals = options.removeLeadVocals !== false;
     const drawTrackLabels = !!options.drawTrackLabels;
     const fixOverlaps = options.fixOverlaps !== false;
 
@@ -325,7 +325,18 @@
     let melodicIndex = 0;
     trackInfos.forEach((t) => {
       if (!t.isInstrument) return;
-      t.destinationChannel = t.isPercussion ? 9 : MELODIC_CHANNELS[melodicIndex++ % MELODIC_CHANNELS.length];
+      if (t.isPercussion) {
+        t.destinationChannel = 9;
+        return;
+      }
+
+      if (melodicIndex >= MELODIC_CHANNELS.length) {
+        t.isInstrument = false;
+        t.shouldRemoveTrack = true;
+        return;
+      }
+
+      t.destinationChannel = MELODIC_CHANNELS[melodicIndex++];
     });
 
     // 2. Consolidation des tempos / rythmes

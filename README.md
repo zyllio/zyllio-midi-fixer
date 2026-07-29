@@ -15,7 +15,7 @@ L'action est déclarée sous la version **Action V2** (`metadataVersion: 2`) ave
 | **`file-url`** | URL MIDI D'origine | `text` | `""` | URL du fichier MIDI brut à nettoyer. | Non |
 | **`value`** | URL MIDI Nettoyé | `text` | `""` | URL publique du fichier MIDI final traité. | **Oui** (Résultat) |
 | **`keep-cc`** | Conserver les CC | `boolean` | `false` | Conserve les événements de type Control Change (modulation, volume, expression). | Non |
-| **`remove-lead-vocals`** | Retirer le chant principal | `boolean` | `false` | Exclut les pistes identifiées comme chant principal, sans retirer les choeurs. | Non |
+| **`remove-lead-vocals`** | Retirer le chant principal | `boolean` | `true` | Exclut les pistes identifiées comme chant principal, sans retirer les choeurs. | Non |
 | **`draw-track-labels`** | Dessiner les noms de pistes | `boolean` | `false` | Ajoute un label visuel en notes MIDI très aiguës à vélocité 1 au début de chaque piste. | Non |
 | **`fix-overlaps`** | Résoudre les chevauchements | `boolean` | `true` | Corrige les notes consécutives d'une même hauteur qui se touchent. | Non |
 
@@ -36,7 +36,7 @@ $$\text{tick\_cible} = \text{round}\left(\frac{\text{tick\_origine} \times \text
 ### B. Classification des Pistes et Réaffectation des Canaux
 Pour éviter les conflits d'instruments, le script réorganise l'attribution des canaux MIDI :
 1.  **Détection de Batterie/Percussions** : Le canal MIDI 10 (index interne `9`) est réservé aux percussions. Une piste est classée comme percussion si son nom (dans les métadonnées textuelles) contient des termes clés comme `drums`, `percussion`, `perc`, `batterie`, etc. (via regex), ou si des notes sont déjà jouées sur le canal 10 d'origine.
-2.  **Canaux Mélodiques** : Les pistes instrumentales mélodiques sont réaffectées de façon séquentielle aux 15 autres canaux MIDI disponibles : `[0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15]`. Si le fichier contient plus de 15 pistes mélodiques, un modulo réaffecte les canaux depuis le début.
+2.  **Canaux Mélodiques** : Les pistes instrumentales mélodiques sont réaffectées de façon séquentielle aux 15 autres canaux MIDI disponibles : `[0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15]`. Si le fichier contient plus de 15 pistes mélodiques, les pistes excédentaires sont ignorées afin d'éviter que plusieurs pistes partagent le même canal dans les synthétiseurs qui regroupent l'affichage par canal.
 
 ### C. Consolidation des Événements Temporels
 Les événements globaux de tempo (`setTempo`) et de signature rythmique (`timeSignature`) sont extraits de toutes les pistes d'origine, dédoublonnés (pour éviter les répétitions inutiles au même tick) et consolidés sur la **première piste instrumentale** (piste 0) du fichier reconstruit.
@@ -46,7 +46,7 @@ Pour chaque piste instrumentale, le script apparie chaque événement d'allumage
 *   Si une note est "suspendue" (aucun message d'extinction trouvé avant la fin de la piste), le script force sa fin au tick de fin de la piste (`endTime`).
 
 ### E. Exclusion optionnelle du chant principal
-Lorsque l'option `remove-lead-vocals` est activée, les pistes dont les métadonnées contiennent des termes comme `lead vocal`, `lead vocals`, `chant`, `voix` ou `vocal lead` sont ignorées. Les pistes de choeurs restent conservées si elles contiennent des termes comme `backing vocals`, `choir`, `choeur`, `chorus`, `aah` ou `ooh`.
+Par défaut, les pistes dont les métadonnées contiennent des termes comme `lead vocal`, `lead vocals`, `chant`, `voix` ou `vocal lead` sont ignorées. Les pistes de choeurs restent conservées si elles contiennent des termes comme `backing vocals`, `choir`, `choeur`, `chorus`, `aah` ou `ooh`. Ce comportement peut être désactivé avec l'option `remove-lead-vocals`.
 
 ### F. Labels visuels dans le piano roll
 Lorsque l'option `draw-track-labels` est activée, le script ajoute au tick `0` de chaque piste instrumentale un label court dessiné avec des notes MIDI dans l'extrême aigu. Ces notes utilisent une vélocité de `1` et servent de repère visuel dans les synthétiseurs qui affichent seulement le piano roll. Le morceau n'est pas décalé.

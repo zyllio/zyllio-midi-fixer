@@ -27,7 +27,7 @@ function labelColumnSignature(track) {
     .filter((event) =>
       event.type === "noteOn" &&
       event.velocity === 1 &&
-      event.noteNumber >= 123
+      event.noteNumber >= 116
     )
     .forEach((event) => {
       const notes = columns.get(event.absoluteTime) || [];
@@ -97,6 +97,19 @@ describe("plugin cleanMidi", () => {
     expect(eventsOfType(output.tracks[0], "noteOn")[0].channel).toBe(9);
   });
 
+  test("ignores melodic tracks when no unique melodic channel remains", () => {
+    const { cleanMidi } = loadPlugin();
+    const tracks = Array.from({ length: 16 }, (_, index) => noteTrack(`Instrument ${index + 1}`));
+    const output = cleanMidi({
+      header: { format: 1, ticksPerBeat: 480, numTracks: tracks.length },
+      tracks
+    });
+
+    expect(eventsOfType(output.tracks[14], "noteOn")).toHaveLength(1);
+    expect(eventsOfType(output.tracks[14], "noteOn")[0].channel).toBe(15);
+    expect(eventsOfType(output.tracks[15], "noteOn")).toEqual([]);
+  });
+
   test("can remove lead vocal tracks while keeping backing vocals", () => {
     const { cleanMidi } = loadPlugin();
     const output = cleanMidi({
@@ -111,6 +124,32 @@ describe("plugin cleanMidi", () => {
     expect(eventsOfType(output.tracks[0], "noteOn")).toEqual([]);
     expect(eventsOfType(output.tracks[1], "noteOn")).toHaveLength(1);
     expect(eventsOfType(output.tracks[2], "noteOn")).toHaveLength(1);
+  });
+
+  test("removes lead vocal tracks by default", () => {
+    const { cleanMidi, registered } = loadPlugin();
+    const removeLeadVocals = registered[0].metadata.properties.find((property) => property.id === "remove-lead-vocals");
+    const output = cleanMidi({
+      header: { format: 1, ticksPerBeat: 480, numTracks: 2 },
+      tracks: [
+        noteTrack("Lead Vocals"),
+        noteTrack("Guitar")
+      ]
+    });
+
+    expect(removeLeadVocals.default).toBe(true);
+    expect(eventsOfType(output.tracks[0], "noteOn")).toEqual([]);
+    expect(eventsOfType(output.tracks[1], "noteOn")).toHaveLength(1);
+  });
+
+  test("can keep lead vocal tracks when explicitly disabled", () => {
+    const { cleanMidi } = loadPlugin();
+    const output = cleanMidi({
+      header: { format: 1, ticksPerBeat: 480, numTracks: 1 },
+      tracks: [noteTrack("Lead Vocals")]
+    }, { removeLeadVocals: false });
+
+    expect(eventsOfType(output.tracks[0], "noteOn")).toHaveLength(1);
   });
 
   test("can remove chant tracks", () => {
@@ -137,7 +176,7 @@ describe("plugin cleanMidi", () => {
     const labelNotes = absoluteEvents(output.tracks[0]).filter((event) =>
       event.type === "noteOn" &&
       event.velocity === 1 &&
-      event.noteNumber >= 123
+      event.noteNumber >= 116
     );
 
     expect(labelNotes).toEqual([]);
@@ -147,23 +186,76 @@ describe("plugin cleanMidi", () => {
     const { cleanMidi } = loadPlugin();
     const output = cleanMidi({
       header: { format: 1, ticksPerBeat: 480, numTracks: 1 },
-      tracks: [noteTrack("Lead Vocals")]
+      tracks: [noteTrack("Guitar")]
     }, { drawTrackLabels: true });
 
     const labelNotes = absoluteEvents(output.tracks[0]).filter((event) =>
       event.type === "noteOn" &&
       event.velocity === 1 &&
-      event.noteNumber >= 123
+      event.noteNumber >= 116
     );
 
     expect(labelNotes.length).toBeGreaterThan(0);
     expect(labelNotes[0]).toMatchObject({
       absoluteTime: 0,
       channel: 0,
-      noteNumber: 127,
+      noteNumber: 120,
       velocity: 1
     });
     expect(Math.max(...labelNotes.map((event) => event.absoluteTime))).toBeGreaterThanOrEqual(2400);
+  });
+
+  test.each([
+    ["D", "120,119,118,117,116|120,116|119,118,117"],
+    ["V", "120,119,118,117|116|120,119,118,117"],
+    ["K", "120,119,118,117,116|119,117|120,116"],
+    ["I", "120,116|120,119,118,117,116|120,116"],
+    ["G", "120,119,118,117|120,116|120,118,117,116"],
+    ["T", "120|120,119,118,117,116|120"]
+  ])("draws the %s label glyph clearly", (label, expectedSignature) => {
+    const { cleanMidi } = loadPlugin();
+    const output = cleanMidi({
+      header: { format: 1, ticksPerBeat: 480, numTracks: 1 },
+      tracks: [noteTrack(label)]
+    }, { drawTrackLabels: true });
+
+    expect(labelColumnSignature(output.tracks[0])).toBe(expectedSignature);
+  });
+
+  test.each(["D", "V", "K", "I", "G", "T"])("keeps the %s label glyph three columns wide", (label) => {
+    const { cleanMidi } = loadPlugin();
+    const output = cleanMidi({
+      header: { format: 1, ticksPerBeat: 480, numTracks: 1 },
+      tracks: [noteTrack(label)]
+    }, { drawTrackLabels: true });
+
+    const labelTimes = new Set(absoluteEvents(output.tracks[0])
+      .filter((event) =>
+        event.type === "noteOn" &&
+        event.velocity === 1 &&
+        event.noteNumber >= 116
+      )
+      .map((event) => event.absoluteTime));
+
+    expect([...labelTimes]).toHaveLength(3);
+    expect(Math.max(...labelTimes)).toBe(480);
+  });
+
+  test("keeps each label pixel as a distinct note", () => {
+    const { cleanMidi } = loadPlugin();
+    const output = cleanMidi({
+      header: { format: 1, ticksPerBeat: 480, numTracks: 1 },
+      tracks: [noteTrack("Backing Vocals")]
+    }, { drawTrackLabels: true });
+
+    const firstGlyphC9NoteOns = absoluteEvents(output.tracks[0]).filter((event) =>
+      event.type === "noteOn" &&
+      event.velocity === 1 &&
+      event.noteNumber === 120 &&
+      event.absoluteTime < 720
+    );
+
+    expect(firstGlyphC9NoteOns.map((event) => event.absoluteTime)).toEqual([0, 240]);
   });
 
   test("uses detailed label mappings instead of broad string labels", () => {
