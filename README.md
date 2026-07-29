@@ -15,6 +15,7 @@ L'action est déclarée sous la version **Action V2** (`metadataVersion: 2`) ave
 | **`file-url`** | URL MIDI D'origine | `text` | `""` | URL du fichier MIDI brut à nettoyer. | Non |
 | **`value`** | URL MIDI Nettoyé | `text` | `""` | URL publique du fichier MIDI final traité. | **Oui** (Résultat) |
 | **`keep-cc`** | Conserver les CC | `boolean` | `false` | Conserve les événements de type Control Change (modulation, volume, expression). | Non |
+| **`remove-lead-vocals`** | Retirer le chant principal | `boolean` | `false` | Exclut les pistes identifiées comme chant principal, sans retirer les choeurs. | Non |
 | **`fix-overlaps`** | Résoudre les chevauchements | `boolean` | `true` | Corrige les notes consécutives d'une même hauteur qui se touchent. | Non |
 
 ### Transitions
@@ -43,7 +44,10 @@ Les événements globaux de tempo (`setTempo`) et de signature rythmique (`timeS
 Pour chaque piste instrumentale, le script apparie chaque événement d'allumage de note (`noteOn` avec vélocité > 0) avec son événement d'extinction (`noteOff` ou `noteOn` avec vélocité = 0) correspondant pour la même note :
 *   Si une note est "suspendue" (aucun message d'extinction trouvé avant la fin de la piste), le script force sa fin au tick de fin de la piste (`endTime`).
 
-### E. Résolution des Chevauchements
+### E. Exclusion optionnelle du chant principal
+Lorsque l'option `remove-lead-vocals` est activée, les pistes dont les métadonnées contiennent des termes comme `lead vocal`, `lead vocals`, `chant`, `voix` ou `vocal lead` sont ignorées. Les pistes de choeurs restent conservées si elles contiennent des termes comme `backing vocals`, `choir`, `choeur`, `chorus`, `aah` ou `ooh`.
+
+### F. Résolution des Chevauchements
 Pour éviter que deux notes consécutives de même hauteur sur un même canal ne se chevauchent ou ne s'éteignent/s'allument au même tick (ce qui peut empêcher certains synthétiseurs physiques de re-déclencher la note), le script raccourcit la première note :
 *   Sa fin est ajustée à : `fin_note_1 = debut_note_2 - 1`.
 *   Si cet ajustement réduit la durée de la note à 0 ou moins, la note 1 est tout simplement supprimée.

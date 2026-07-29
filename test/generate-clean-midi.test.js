@@ -5,10 +5,9 @@ const { loadPlugin } = require("./helpers/load-plugin");
 const inputDir = path.join(__dirname, "fixtures", "input");
 const outputDir = path.join(__dirname, "fixtures", "output");
 
-const fixtures = [
-  "song1.mid",
-  "song2.mid"
-];
+const fixtures = fs.readdirSync(inputDir)
+  .filter((fileName) => /\.mid$/i.test(fileName))
+  .sort();
 
 async function importPluginRuntimeModule(specifier) {
   if (specifier !== "https://esm.sh/midi-file") {

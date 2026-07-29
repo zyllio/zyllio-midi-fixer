@@ -69,6 +69,36 @@ describe("plugin cleanMidi", () => {
     expect(eventsOfType(output.tracks[0], "noteOn")[0].channel).toBe(9);
   });
 
+  test("can remove lead vocal tracks while keeping backing vocals", () => {
+    const { cleanMidi } = loadPlugin();
+    const output = cleanMidi({
+      header: { format: 1, ticksPerBeat: 480, numTracks: 3 },
+      tracks: [
+        noteTrack("Axl Rose | Lead Vocals"),
+        noteTrack("Orchestra | Backing Vocals"),
+        noteTrack("Guitar")
+      ]
+    }, { removeLeadVocals: true });
+
+    expect(eventsOfType(output.tracks[0], "noteOn")).toEqual([]);
+    expect(eventsOfType(output.tracks[1], "noteOn")).toHaveLength(1);
+    expect(eventsOfType(output.tracks[2], "noteOn")).toHaveLength(1);
+  });
+
+  test("can remove chant tracks", () => {
+    const { cleanMidi } = loadPlugin();
+    const output = cleanMidi({
+      header: { format: 1, ticksPerBeat: 480, numTracks: 2 },
+      tracks: [
+        noteTrack("Chant"),
+        noteTrack("Choeur")
+      ]
+    }, { removeLeadVocals: true });
+
+    expect(eventsOfType(output.tracks[0], "noteOn")).toEqual([]);
+    expect(eventsOfType(output.tracks[1], "noteOn")).toHaveLength(1);
+  });
+
   test("keeps only useful pitch bend changes", () => {
     const { cleanMidi } = loadPlugin();
     const output = cleanMidi({

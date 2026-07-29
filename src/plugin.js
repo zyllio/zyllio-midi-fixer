@@ -28,6 +28,7 @@
       // Exécution de la logique métier pure (Section 2)
       const options = {
         keepCc: this.keepCc === true || this.keepCc === 'true',
+        removeLeadVocals: this.removeLeadVocals === true || this.removeLeadVocals === 'true',
         fixOverlaps: this.fixOverlaps !== false && this.fixOverlaps !== 'false'
       };
 
@@ -80,6 +81,11 @@
       type: 'boolean',
       default: false
     }, {
+      id: 'remove-lead-vocals',
+      name: 'Retirer le chant principal',
+      type: 'boolean',
+      default: false
+    }, {
       id: 'fix-overlaps',
       name: 'Résoudre les chevauchements',
       type: 'boolean',
@@ -93,6 +99,7 @@
         { id: 'value', name: 'Cleaned MIDI URL' },
         { id: 'file-url', name: 'Original MIDI URL' },
         { id: 'keep-cc', name: 'Keep Control Changes' },
+        { id: 'remove-lead-vocals', name: 'Remove Lead Vocals' },
         { id: 'fix-overlaps', name: 'Resolve Overlaps' }
       ]
     }]
@@ -168,6 +175,15 @@
     return isPercName || absoluteEvents.some(e => isPlayableNoteOn(e) && e.channel === 9);
   };
 
+  const isChoirTrackText = (text) =>
+    /\b(backing vocals?|choirs?|choeur|choeurs|chorus|aahs?|oohs?)\b/i.test(text);
+
+  const isLeadVocalTrack = (track) => {
+    const text = getTrackText(track);
+    const isLeadVocalName = /\b(lead vocals?|chant|voix|vocal lead)\b/i.test(text);
+    return isLeadVocalName && !isChoirTrackText(text);
+  };
+
   /**
    * Fonction logique pure de nettoyage MIDI. Exclut toute référence spécifique à Zyllio.
    */
@@ -175,17 +191,20 @@
     const sourceTicksPerBeat = inputMidi.header.ticksPerBeat;
     
     const keepCc = !!options.keepCc;
+    const removeLeadVocals = !!options.removeLeadVocals;
     const fixOverlaps = options.fixOverlaps !== false;
 
     // 1. Classification & allocation des canaux
     const trackInfos = inputMidi.tracks.map((track, index) => {
       const events = toAbsoluteEvents(track);
       const notesCount = events.filter(isPlayableNoteOn).length;
-      const isInstrument = notesCount > 0;
+      const shouldRemoveTrack = removeLeadVocals && isLeadVocalTrack(track);
+      const isInstrument = notesCount > 0 && !shouldRemoveTrack;
       return {
         index,
         events,
         isInstrument,
+        shouldRemoveTrack,
         isPercussion: isInstrument && isPercussionTrack(track, events),
         endTime: getTrackEndTime(events),
         destinationChannel: null
